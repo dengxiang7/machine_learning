@@ -1,0 +1,134 @@
+%matplotlib inline
+from svmutil import *
+import time
+from mxnet.gluon import data as gdata
+import numpy as np
+import struct   #处理数据流
+import sys
+sys.path.append("..")
+from matplotlib import pyplot as plt
+import time
+import tools.readimg as tl
+import math
+from numpy import matlib
+
+
+
+#生成两类正态样本
+def genexam():
+    z = [[[1.0, 0], [0, 10.0]],[[10.0, 0], [0, 1.0]]]
+    u=[[1.0, 10],[10, 1.0]]
+    a=[0.4,0.6]
+    x1=[]
+    x2=[]
+    for i in range(800):
+        ui=np.random.multinomial(1,a,1)  #  按照给定的概率分布 决定 用哪个高斯分布生成样本
+        ui=ui[0]
+        if ui[0]==1:
+            x1.append((np.random.multivariate_normal(u[0], z[0],1))[0]) #生成二维正态样本  
+        if ui[1]==1:
+            x2.append((np.random.multivariate_normal(u[1], z[1],1))[0])
+    x1=(np.array(x1).T)
+    x2=(np.array(x2).T)
+    x3=np.hstack((x1,x2)).T
+  
+    return x1,x2,x3
+    
+xxx1,xxx2,xxx3=genexam()
+
+
+fp=open('xcc1.txt', 'wb')
+fp.write(xxx2.tostring())
+fp.close()
+
+
+fp=open('xcc1.txt', 'rb')
+tx=fp.read()
+fp.close()
+tx=(np.fromstring(tx))
+
+print(tx)
+
+#生成两类线性可分的二维正态分布样本，用来训练二类线性SVM，画出决策面和管道，并标出支持向量
+#生成两类正态样本
+
+fp=open('x2.txt', 'rb')
+x2=fp.read()
+fp.close()
+x2=(np.fromstring(x2))
+x2=x2.reshape(2,int(x2.shape[0]/2))
+
+fp=open('x1.txt', 'rb')
+x1=fp.read()
+fp.close()
+x1=(np.fromstring(x1))
+x1=x1.reshape(2,int(x1.shape[0]/2))
+
+
+        
+        
+# 原始数据散点图
+def draw(xx3,x2):
+    plt.scatter(xx3[:, 0],xx3[:, 1], s=5, c='r')
+    plt.scatter(x2[:, 0],x2[:, 1], s=5, c='b')
+    plt.title('Raw Data')
+    plt.show()
+
+# 原始数据散点图
+def draw2(xx3,x2,w,b,b11,b22,sv):
+    plt.figure(figsize=(8,8))
+    plt.scatter(xx3[:, 0],xx3[:, 1], s=15, c='r')
+    plt.scatter(x2[:, 0],x2[:, 1], s=15, c='b')
+    plt.scatter(sv[:, 0],sv[:, 1], s=100, alpha=0.1,linewidths=[3],edgecolors='face',marker='o')
+    x = np.linspace(4, 7,4)
+    y = (-((w[0])[0])*x-b[0])/((w[0])[1])
+    xx = np.linspace(6, 9,4)
+    yy = (-((w[0])[0])*xx-(b11))/((w[0])[1])
+    xxx = np.linspace(1, 5,4)
+    yyy = (-((w[0])[0])*xxx-(b22))/((w[0])[1])
+    plt.plot(x,y)
+    plt.plot(xx,yy,c='y')
+    plt.plot(xxx,yyy,c='200')
+    plt.title('Raw Data')
+    plt.show()
+    
+#draw(x1.T,x2.T)
+
+y,x=svm_read_problem('test.txt')
+m=svm_train(y,x,'-t 0 -c 1')
+
+
+x=m.get_SV()
+a=m.get_sv_coef()
+w=np.zeros((1,2))
+for i,t in zip(x,a):
+    w=w+t[0]*np.array([i[1],i[2]])
+w=np.array(w)    
+#print(w)    
+
+num=0;
+sumb=0
+sv=[]
+for i,t in zip(x,a):
+    num+=1
+    if t[0] <0:
+        sv.append([i[1],i[2]])
+        sumb+=-(1-(-1*np.dot([i[1],i[2]],w.T)))
+    if t[0] >0:
+        sv.append([i[1],i[2]])
+        sumb+=(1-(np.dot([i[1],i[2]],w.T)))  
+
+b=sumb/num        
+
+sumb11=0
+sumb22=0
+for i,t in zip(x,a):
+   
+    if t[0] <0:
+        sumb11=-np.dot([i[1],i[2]],w.T)
+    if t[0] >0:
+        sumb22=-np.dot([i[1],i[2]],w.T)
+        
+
+sv=np.array(sv).T
+draw2(x1.T,x2.T,w,b,sumb11[0],sumb22[0],sv.T)
